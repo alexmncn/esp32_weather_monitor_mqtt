@@ -47,6 +47,45 @@ DHT dht(DHT_PIN, DHT_TYPE);
 Adafruit_MAX17048 bat;
 
 
+//------------- Time -------------
+
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 2*3600;
+const int daylightOffset_sec = 0;
+
+
+void synchronizeTime() {
+  // Configurar y sincronizar la hora desde un servidor NTP
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); // Configurar el servidor NTP 
+
+  // Esperar a que se establezca la hora
+  while (!time(nullptr)) {
+    delay(1000);
+    Serial.println("Esperando sincronización de tiempo...");
+  }
+
+  Serial.println("Hora sincronizada correctamente");
+}
+
+
+String getFormattedDateTime() {
+  // Get current time in UNIX
+  time_t now = time(nullptr);
+
+  // Convert UNIX time to a local time structure
+  struct tm timeinfo;
+  localtime_r(&now, &timeinfo);
+
+  // Format the date and time in the format 'DD-MM-YYYY HH:MM:SS'
+  char formattedTime[20];
+  snprintf(formattedTime, sizeof(formattedTime), "%02d-%02d-%04d %02d:%02d:%02d",
+           timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900,
+           timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+
+  return String(formattedTime);
+}
+
+
 bool getTempAndHumd(float &temperature, float &humidity) {
   dht.begin();
   // Try to measure data
@@ -111,6 +150,10 @@ void setup() {
   
   // Wifi
   detectAndConect();
+
+  // Time sync
+  synchronizeTime();
+  print(getFormattedDateTime());
 
   // Batery
   bat.begin();
