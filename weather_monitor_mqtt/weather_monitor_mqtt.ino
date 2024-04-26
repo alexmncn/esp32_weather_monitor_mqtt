@@ -31,6 +31,10 @@ struct Network networks[] = {
   {WIFI_SSID_2, WIFI_PASSWORD_2},
 };
 
+struct Network last_network[] = {
+  {" ", " "},
+};
+
 WiFiClient espClient;
 
 
@@ -55,7 +59,7 @@ Adafruit_MAX17048 bat;
 
 //------------- Time -------------
 
-const char* ntpServer = "pool.ntp.org";
+const char* ntpServer = "time1.google.com";
 const long gmtOffset_sec = 2*3600;
 const int daylightOffset_sec = 0;
 
@@ -109,8 +113,7 @@ bool getTempAndHumd(float &temperature, float &humidity) {
 }
 
 
-void detectAndConect() {
-  for (const auto& network : networks) {
+void WifiConnect(Network network) {
     WiFi.begin(network.ssid, network.password);
     
     Serial.print("Intentando conectar a la red ");
@@ -126,9 +129,22 @@ void detectAndConect() {
     if (WiFi.status() == WL_CONNECTED) {
       Serial.println("");
       Serial.println("Wifi Conectado");
-      return; // Sale de la función si la conexión es exitosa
+
+      // Saves this net as the last connected
+      last_network[0].ssid = network.ssid;
+      last_network[0].password = network.password;
+
+      return; // Exit function if success
     }
     Serial.println("");
+}
+
+void detectAndConnect() {
+  for (const auto& network : networks) {
+    WifiConnect(network);
+    if (WiFi.status() == WL_CONNECTED) {
+      return;
+    }
   }
   
   Serial.println("");
@@ -139,6 +155,9 @@ void detectAndConect() {
 
 void setup() {
   Serial.begin(115200);
+
+  // Batery
+  bat.begin();
 
   delay(1000);
 
@@ -155,14 +174,11 @@ void setup() {
   //--------------------------------------
   
   // Wifi
-  detectAndConect();
+  detectAndConnect();
 
   // Time sync
   synchronizeTime();
-  Serial.print(getFormattedDateTime());
-
-  // Batery
-  bat.begin();
+  Serial.println(getFormattedDateTime());
 
   // MQTT
   client.setServer(MQTT_BROKER, MQTT_PORT);
@@ -194,7 +210,11 @@ void loop() {
 
   // Wifi
   if (WiFi.status() != WL_CONNECTED){
-    detectAndConect();
+    WifiConnect(last_network[0]);
+  }
+
+  if (WiFi.status() != WL_CONNECTED){
+    detectAndConnect();
   }
 
   // Publish the mqtt message
