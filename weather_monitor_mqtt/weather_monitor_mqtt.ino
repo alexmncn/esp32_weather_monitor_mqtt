@@ -11,7 +11,7 @@
 #include <ArduinoJson.h>
 #include "DHT.h"
 
-#include <secrets.h>
+#include "secrets.h"
 
 //---------------------------- DISPLAY --------------------------------
 
@@ -32,6 +32,12 @@ struct Network networks[] = {
 };
 
 WiFiClient espClient;
+
+
+//-------------- MQTT ------------------
+// Parameters defined in secrets.h file
+
+PubSubClient client(espClient);
 
 
 //----------------------------- DHT22 Sensor  -----------------------------
@@ -153,11 +159,13 @@ void setup() {
 
   // Time sync
   synchronizeTime();
-  print(getFormattedDateTime());
+  Serial.print(getFormattedDateTime());
 
   // Batery
   bat.begin();
 
+  // MQTT
+  client.setServer(MQTT_BROKER, MQTT_PORT);
 }
 
 
@@ -166,6 +174,42 @@ void loop() {
   float temperature, humidity;
   getTempAndHumd(temperature, humidity);
 
+  float battery = (bat.cellPercent());
+
+  String currentTime;
+  currentTime = getFormattedDateTime();
+
+  DynamicJsonDocument data(256);
+  data["sensor"] = MQTT_CLIENT_ID;
+  data["temp"] = temperature;
+  data["humd"] = humidity;
+  data["date"] = currentTime;
+  data["battery"] = battery;
+
+
+  // Serialize the data object in JSON
+  char data_sensors[256];
+  serializeJson(data, data_sensors);
+  Serial.println(data_sensors);
+
+  // Wifi
+  if (WiFi.status() != WL_CONNECTED){
+    detectAndConect();
+  }
+
+  // Publish the mqtt message
+  if (WiFi.status() == WL_CONNECTED) {
+    client.connect(MQTT_CLIENT_ID);
+    if (client.connected()) {
+      bool resp = client.publish(TOPIC, data_sensors, false);
+      if (resp) {
+        Serial.println("Mensaje publicado correctamente");
+      }else {
+        Serial.println("Error");
+      }
+      
+    }
+  }
   
   // DISPLAY
   canvas.fillScreen(ST77XX_BLACK);
