@@ -67,7 +67,7 @@ const int daylightOffset_sec = 0;
 void synchronizeTime() {
   // Configurar y sincronizar la hora desde un servidor NTP
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); // Configurar el servidor NTP 
-
+  delay(5000);
   // Esperar a que se establezca la hora
   while (!time(nullptr)) {
     delay(1000);
