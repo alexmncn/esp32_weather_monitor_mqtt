@@ -9,6 +9,7 @@
 #include <ESP32Time.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#include <esp_sleep.h>
 #include "DHT.h"
 
 #include "secrets.h"
@@ -17,6 +18,8 @@
 
 Adafruit_ST7789 display = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 GFXcanvas16 canvas(240, 135);
+
+int d1_button = 1;
 
 
 //---------------- WiFi Credentials ------------------
@@ -31,9 +34,7 @@ struct Network networks[] = {
   {WIFI_SSID_2, WIFI_PASSWORD_2},
 };
 
-struct Network last_network[] = {
-  {" ", " "},
-};
+RTC_DATA_ATTR int last_network = 0;
 
 WiFiClient espClient;
 
@@ -120,7 +121,7 @@ void WifiConnect(Network network) {
     Serial.print(network.ssid);
     
     int try_count = 0;
-    while (WiFi.status() != WL_CONNECTED && try_count < 10) {
+    while (WiFi.status() != WL_CONNECTED && try_count < 5) {
       try_count++;
       Serial.print(".");
       delay(1000);
@@ -130,26 +131,55 @@ void WifiConnect(Network network) {
       Serial.println("");
       Serial.println("Wifi Conectado");
 
-      // Saves this net as the last connected
-      last_network[0].ssid = network.ssid;
-      last_network[0].password = network.password;
-
       return; // Exit function if success
     }
     Serial.println("");
 }
 
 void detectAndConnect() {
+  int cont = 0;
   for (const auto& network : networks) {
     WifiConnect(network);
     if (WiFi.status() == WL_CONNECTED) {
+      last_network = cont;
       return;
+    }else {
+      cont++;
     }
   }
   
   Serial.println("");
   Serial.println("No se pudo conectar a ninguna red.");
 
+}
+
+
+void showDataOnDisplay() {
+  float temperature, humidity;
+  getTempAndHumd(temperature, humidity);
+
+  // DISPLAY
+  canvas.fillScreen(ST77XX_BLACK);
+  canvas.setCursor(0, 25);
+  canvas.setTextColor(ST77XX_WHITE);
+  canvas.print("Temperatura: ");
+  canvas.print(temperature);
+  canvas.println(" ºC");
+  canvas.print("Humedad: ");
+  canvas.print(humidity);
+  canvas.println(" %");
+  canvas.print("Bateria: ");
+  canvas.print(bat.cellPercent(), 0);
+  canvas.println("%");
+
+
+
+  // Show all canva configuration set before
+  display.drawRGBBitmap(0, 0, canvas.getBuffer(), 240, 135);
+  pinMode(TFT_BACKLITE, OUTPUT);
+  digitalWrite(TFT_BACKLITE, HIGH);
+
+  delay(5000);
 }
 
 
@@ -182,6 +212,16 @@ void setup() {
 
   // MQTT
   client.setServer(MQTT_BROKER, MQTT_PORT);
+
+  // Set up deepsleep
+  //pinMode(d1_button , INPUT_PULLDOWN);
+  //esp_sleep_enable_ext0_wakeup(GPIO_NUM_1, 0);  // Configurar botón como wake-up externo
+  //attachInterrupt(digitalPinToInterrupt(d1_button), showDataOnDisplay, RISING);
+
+
+  // Configurar temporizador para wake-up en 60 segundos (en microsegundos)
+  esp_sleep_enable_timer_wakeup(45 * 1000000);
+
 }
 
 
@@ -210,7 +250,7 @@ void loop() {
 
   // Wifi
   if (WiFi.status() != WL_CONNECTED){
-    WifiConnect(last_network[0]);
+    WifiConnect(networks[last_network]);
   }
 
   if (WiFi.status() != WL_CONNECTED){
@@ -230,30 +270,10 @@ void loop() {
       
     }
   }
-  
-  // DISPLAY
-  canvas.fillScreen(ST77XX_BLACK);
-  canvas.setCursor(0, 25);
-  canvas.setTextColor(ST77XX_WHITE);
-  canvas.print("Temperatura: ");
-  canvas.print(temperature);
-  canvas.println(" ºC");
-  canvas.print("Humedad: ");
-  canvas.print(humidity);
-  canvas.println(" %");
-  canvas.print("Bateria: ");
-  canvas.print(bat.cellPercent(), 0);
-  canvas.println("%");
 
-
-
-  // Show all canva configuration set before
-  display.drawRGBBitmap(0, 0, canvas.getBuffer(), 240, 135);
-  pinMode(TFT_BACKLITE, OUTPUT);
-  digitalWrite(TFT_BACKLITE, HIGH);
-
-  // Apagamos wifi
+  // Turn off Wifi
   WiFi.disconnect(true);
-  delay(60000);
-  return;
+
+  Serial.println("Entrando en deep sleep...");
+  esp_deep_sleep_start();
 }
