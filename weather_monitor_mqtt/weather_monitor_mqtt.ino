@@ -14,12 +14,18 @@
 
 #include "secrets.h"
 
+
+// ------------------- DeepSleep ------------------
+
+const int DP_time = 58 * 1000000; // Time to wake up in Seconds to miliseconds
+RTC_DATA_ATTR int first_init = 0;
+
+
+
 //---------------------------- DISPLAY --------------------------------
 
 Adafruit_ST7789 display = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 GFXcanvas16 canvas(240, 135);
-
-int d1_button = 1;
 
 
 //---------------- WiFi Credentials ------------------
@@ -65,13 +71,13 @@ const long gmtOffset_sec = 2*3600;
 const int daylightOffset_sec = 0;
 
 
-void synchronizeTime() {
+void synchronizeTime(int del) {
   // Configurar y sincronizar la hora desde un servidor NTP
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); // Configurar el servidor NTP 
-  delay(5000);
+  delay(del);
   // Esperar a que se establezca la hora
   while (!time(nullptr)) {
-    delay(1000);
+    delay(del);
     Serial.println("Esperando sincronización de tiempo...");
   }
 
@@ -114,7 +120,7 @@ bool getTempAndHumd(float &temperature, float &humidity) {
 }
 
 
-void WifiConnect(Network network) {
+void WifiConnect(struct Network network) {
     WiFi.begin(network.ssid, network.password);
     
     Serial.print("Intentando conectar a la red ");
@@ -185,11 +191,13 @@ void showDataOnDisplay() {
 
 void setup() {
   Serial.begin(115200);
+  delay(500);
+  Serial.println(" ");
+
 
   // Batery
   bat.begin();
 
-  delay(1000);
 
   // SET-UP display --------------------
   // turn on the TFT / I2C power supply
@@ -203,12 +211,26 @@ void setup() {
   canvas.setTextColor(ST77XX_WHITE);
   //--------------------------------------
   
-  // Wifi
-  detectAndConnect();
+  String time_now;
+  if (first_init == 0) {
+    // Wifi
+    detectAndConnect();
 
-  // Time sync
-  synchronizeTime();
-  Serial.println(getFormattedDateTime());
+    // Time sync 
+    synchronizeTime(1000);
+    time_now = getFormattedDateTime();
+    Serial.println(time_now);
+    first_init = 1;
+  }
+
+  time_now = getFormattedDateTime();
+  if (first_init == 1 && time_now.indexOf("1970") != -1) {
+    WifiConnect(networks[last_network]);
+
+    // Time sync 
+    Serial.println("Intentando restablecer hora");
+    synchronizeTime(2000);
+  }
 
   // MQTT
   client.setServer(MQTT_BROKER, MQTT_PORT);
@@ -219,8 +241,8 @@ void setup() {
   //attachInterrupt(digitalPinToInterrupt(d1_button), showDataOnDisplay, RISING);
 
 
-  // Configurar temporizador para wake-up en 60 segundos (en microsegundos)
-  esp_sleep_enable_timer_wakeup(45 * 1000000);
+  // Configurar temporizador para wake-up 
+  esp_sleep_enable_timer_wakeup(DP_time);
 
 }
 
