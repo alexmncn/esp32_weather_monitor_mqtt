@@ -245,8 +245,6 @@ void setup() {
     synchronizeTime(2000);
   }
 
-  // MQTT
-  client.setServer(MQTT_BROKER, MQTT_PORT);
 
   // Set up deepsleep
   //pinMode(d1_button , INPUT_PULLDOWN);
@@ -292,8 +290,15 @@ void loop() {
     detectAndConnect();
   }
 
-  // Publish the mqtt message
   if (WiFi.status() == WL_CONNECTED) {
+    // Broker exception
+    if (networks[last_network].ssid == WIFI_SSID_2) {
+      client.setServer(MQTT_BROKER_2, MQTT_PORT);
+    } else {
+      client.setServer(MQTT_BROKER, MQTT_PORT);
+    }
+
+    // Publish the mqtt message
     client.connect(MQTT_CLIENT_ID);
     if (client.connected()) {
       bool resp = client.publish(TOPIC, data_sensors, false);
