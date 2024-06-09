@@ -67,10 +67,8 @@ Adafruit_MAX17048 bat;
 //------------- Time -------------
 
 const char* ntpServer = "time1.google.com";
-const long gmtOffset_sec = 0; //  I wont use it.
+const long gmtOffset_sec = 2*3600; //  I wont use it.
 const int daylightOffset_sec = 0;
-
-const int time_zone_offset = 2; //In Spain 2 hours (UTC +2)
 
 
 void synchronizeTime(int del) {
@@ -97,20 +95,11 @@ String getFormattedDateTime() {
   localtime_r(&now, &timeinfo);
 
   char formattedTime[20];
-  // Apply manually the time zone
-  int hour_correction, day_correction;
-  if(timeinfo.tm_hour + time_zone_offset >= 24) {
-    day_correction = 1; // Add one more day
-    hour_correction = time_zone_offset - 24; // Subtract the day (in hours) added above minus the offset hours
-  } else {
-    day_correction = 0;
-    hour_correction = time_zone_offset;
-  }
 
   // Format the date and time in the format 'DD-MM-YYYY HH:MM:SS'
   snprintf(formattedTime, sizeof(formattedTime), "%02d-%02d-%04d %02d:%02d:%02d",
-            timeinfo.tm_mday + day_correction, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900,
-            timeinfo.tm_hour + hour_correction, timeinfo.tm_min, timeinfo.tm_sec);
+            timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900,
+            timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
   return String(formattedTime);
 
 }
@@ -263,8 +252,11 @@ void loop() {
   float temperature, humidity;
   getTempAndHumd(temperature, humidity);
 
+  // Read the battery level
   float battery = (bat.cellPercent());
 
+  // Set the timezone and get the date(Not saved for deepsleep)
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   String currentTime;
   currentTime = getFormattedDateTime();
 
