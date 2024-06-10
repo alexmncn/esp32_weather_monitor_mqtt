@@ -1,6 +1,6 @@
-#include <Adafruit_GFX.h>    // Adafruit GFX
-#include <Adafruit_ST7789.h> // Adafruit ST7789 display
-#include "Adafruit_MAX1704X.h" // Batery chip
+#include <Adafruit_GFX.h>       // Adafruit GFX
+#include <Adafruit_ST7789.h>    // Adafruit ST7789 display
+#include "Adafruit_MAX1704X.h"  // Batery chip
 #include <Fonts/FreeSans9pt7b.h>
 #include <Fonts/FreeSans12pt7b.h>
 #include <Fonts/FreeSans18pt7b.h>
@@ -17,10 +17,10 @@
 
 // ------------------- DeepSleep ------------------
 
-const int DP_time = 58 * 1000000; // Time to wake up in Seconds to miliseconds
+const int DP_time = 58 * 1000000;  // Time to wake up in Seconds to miliseconds
 RTC_DATA_ATTR int first_init = 0;
 
-
+const int wk_pin_button = 12;
 
 //---------------------------- DISPLAY --------------------------------
 
@@ -36,8 +36,8 @@ struct Network {
 };
 
 struct Network networks[] = {
-  {WIFI_SSID_1, WIFI_PASSWORD_1},
-  {WIFI_SSID_2, WIFI_PASSWORD_2},
+  { WIFI_SSID_1, WIFI_PASSWORD_1 },
+  { WIFI_SSID_2, WIFI_PASSWORD_2 },
 };
 
 RTC_DATA_ATTR int last_network = 0;
@@ -53,8 +53,8 @@ PubSubClient client(espClient);
 
 //----------------------------- DHT22 Sensor  -----------------------------
 
-#define DHT_PIN 13     // GPIO sensor
-#define DHT_TYPE DHT22 // Sensor model
+#define DHT_PIN 13      // GPIO sensor
+#define DHT_TYPE DHT22  // Sensor model
 
 DHT dht(DHT_PIN, DHT_TYPE);
 
@@ -67,13 +67,13 @@ Adafruit_MAX17048 bat;
 //------------- Time -------------
 
 const char* ntpServer = "time1.google.com";
-const long gmtOffset_sec = 2*3600; //  I wont use it.
+const long gmtOffset_sec = 2 * 3600;  //  Timezone offset in seconds
 const int daylightOffset_sec = 0;
 
 
 void synchronizeTime(int del) {
   // Configurar y sincronizar la hora desde un servidor NTP
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer); // Configurar el servidor NTP 
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);  // Configurar el servidor NTP
   delay(del);
 
   // Esperar a que se establezca la hora
@@ -98,14 +98,13 @@ String getFormattedDateTime() {
 
   // Format the date and time in the format 'DD-MM-YYYY HH:MM:SS'
   snprintf(formattedTime, sizeof(formattedTime), "%02d-%02d-%04d %02d:%02d:%02d",
-            timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900,
-            timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+           timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900,
+           timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
   return String(formattedTime);
-
 }
 
 
-bool getTempAndHumd(float &temperature, float &humidity) {
+bool getTempAndHumd(float& temperature, float& humidity) {
   dht.begin();
   // Try to measure data
   float temp = dht.readTemperature();
@@ -113,35 +112,35 @@ bool getTempAndHumd(float &temperature, float &humidity) {
 
   // Verify if data is valid
   if (isnan(temp) || isnan(hum)) {
-    return false; // Error, no return anything
+    return false;  // Error, no return anything
   } else {
     temperature = temp;
     humidity = hum;
-    return true; // Read and return success
+    return true;  // Read and return success
   }
 }
 
 
 void WifiConnect(struct Network network) {
-    WiFi.begin(network.ssid, network.password);
-    
-    Serial.print("Intentando conectar a la red ");
-    Serial.print(network.ssid);
-    
-    int try_count = 0;
-    while (WiFi.status() != WL_CONNECTED && try_count < 5) {
-      try_count++;
-      Serial.print(".");
-      delay(1000);
-    }
-    
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("");
-      Serial.println("Wifi Conectado");
+  WiFi.begin(network.ssid, network.password);
 
-      return; // Exit function if success
-    }
+  Serial.print("Intentando conectar a la red ");
+  Serial.print(network.ssid);
+
+  int try_count = 0;
+  while (WiFi.status() != WL_CONNECTED && try_count < 5) {
+    try_count++;
+    Serial.print(".");
+    delay(1000);
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
     Serial.println("");
+    Serial.println("Wifi Conectado");
+
+    return;  // Exit function if success
+  }
+  Serial.println("");
 }
 
 void detectAndConnect() {
@@ -151,14 +150,13 @@ void detectAndConnect() {
     if (WiFi.status() == WL_CONNECTED) {
       last_network = cont;
       return;
-    }else {
+    } else {
       cont++;
     }
   }
-  
+
   Serial.println("");
   Serial.println("No se pudo conectar a ninguna red.");
-
 }
 
 
@@ -196,29 +194,33 @@ void setup() {
   delay(500);
   Serial.println(" ");
 
-
   // Batery
   bat.begin();
-
 
   // SET-UP display --------------------
   // turn on the TFT / I2C power supply
   pinMode(TFT_I2C_POWER, OUTPUT);
   digitalWrite(TFT_I2C_POWER, HIGH);
-  
+
   // Init ST7789 240x135 and parameters
-  display.init(135, 240);           
+  display.init(135, 240);
   display.setRotation(3);
   canvas.setFont(&FreeSans12pt7b);
   canvas.setTextColor(ST77XX_WHITE);
   //--------------------------------------
-  
+
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_EXT0) {
+    showDataOnDisplay();
+  }
+
+  // First init date and wifi setup
   String time_now;
   if (first_init == 0) {
     // Wifi
     detectAndConnect();
 
-    // Time sync 
+    // Time sync
     synchronizeTime(2000);
     time_now = getFormattedDateTime();
     Serial.println(time_now);
@@ -229,25 +231,18 @@ void setup() {
   if (first_init == 1 && time_now.indexOf("1970") != -1) {
     WifiConnect(networks[last_network]);
 
-    // Time sync 
+    // Time sync
     Serial.println("Intentando restablecer hora");
     synchronizeTime(2000);
   }
 
 
-  // Set up deepsleep
-  //pinMode(d1_button , INPUT_PULLDOWN);
-  //esp_sleep_enable_ext0_wakeup(GPIO_NUM_1, 0);  // Configurar botón como wake-up externo
-  //attachInterrupt(digitalPinToInterrupt(d1_button), showDataOnDisplay, RISING);
-
-
-  // Configurar temporizador para wake-up 
+  // Configurar temporizador para wake-up
   esp_sleep_enable_timer_wakeup(DP_time);
+  esp_sleep_enable_ext0_wakeup((gpio_num_t)wk_pin_button, HIGH);
 
-}
+  // --------- READ and SEND DATA -------
 
-
-void loop() {
   // Read sensor data
   float temperature, humidity;
   getTempAndHumd(temperature, humidity);
@@ -274,11 +269,11 @@ void loop() {
   Serial.println(data_sensors);
 
   // Wifi
-  if (WiFi.status() != WL_CONNECTED){
+  if (WiFi.status() != WL_CONNECTED) {
     WifiConnect(networks[last_network]);
   }
 
-  if (WiFi.status() != WL_CONNECTED){
+  if (WiFi.status() != WL_CONNECTED) {
     detectAndConnect();
   }
 
@@ -296,10 +291,9 @@ void loop() {
       bool resp = client.publish(TOPIC, data_sensors, false);
       if (resp) {
         Serial.println("Mensaje publicado correctamente");
-      }else {
+      } else {
         Serial.println("Error");
       }
-      
     }
   }
 
@@ -308,4 +302,8 @@ void loop() {
 
   Serial.println("Entrando en deep sleep...");
   esp_deep_sleep_start();
+}
+
+
+void loop() {
 }
