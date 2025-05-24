@@ -312,17 +312,12 @@ void setup() {
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    // Broker exception
-    if (networks[last_network].ssid == WIFI_SSID_2) {
-      client.setServer(MQTT_BROKER_2, MQTT_PORT);
-    } else {
-      client.setServer(MQTT_BROKER, MQTT_PORT);
-    }
+    client.setServer(MQTT_BROKER, MQTT_PORT);
 
     // Publish the mqtt message
-    client.connect(MQTT_CLIENT_ID);
+    client.connect(MQTT_CLIENT_ID, MQTT_USER, MQTT_PASS);
     if (client.connected()) {
-      bool resp = client.publish(TOPIC, data_sensors, false);
+      bool resp = client.publish(DATA_TOPIC, data_sensors, false);
       if (resp) {
         Serial.println("Mensaje publicado correctamente");
       } else {
