@@ -69,7 +69,7 @@ Adafruit_MAX17048 bat;
 //------------- Time -------------
 
 const char* ntpServer = "time1.google.com";
-const long gmtOffset_sec = 2 * 3600;  //  Timezone offset in seconds
+const long gmtOffset_sec = 1 * 3600;  //  Timezone offset in seconds
 const int daylightOffset_sec = 0;
 
 
