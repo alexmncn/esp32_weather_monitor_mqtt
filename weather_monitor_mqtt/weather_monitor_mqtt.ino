@@ -46,6 +46,8 @@ RTC_DATA_ATTR int last_network = 0;
 
 WiFiClient espClient;
 
+int wifi_tries = 10;
+
 
 //-------------- MQTT ------------------
 // Parameters defined in secrets.h file
@@ -99,8 +101,8 @@ String getFormattedDateTime() {
   char formattedTime[20];
 
   // Format the date and time in the format 'DD-MM-YYYY HH:MM:SS'
-  snprintf(formattedTime, sizeof(formattedTime), "%02d-%02d-%04d %02d:%02d:%02d",
-           timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900,
+  snprintf(formattedTime, sizeof(formattedTime), "%04d-%02d-%02d %02d:%02d:%02d",
+           timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
            timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
   return String(formattedTime);
 }
@@ -130,7 +132,7 @@ void WifiConnect(struct Network network) {
   Serial.print(network.ssid);
 
   int try_count = 0;
-  while (WiFi.status() != WL_CONNECTED && try_count < 5) {
+  while (WiFi.status() != WL_CONNECTED && try_count < wifi_tries) {
     try_count++;
     Serial.print(".");
     delay(1000);
