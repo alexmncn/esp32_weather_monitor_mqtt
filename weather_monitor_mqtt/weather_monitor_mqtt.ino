@@ -287,7 +287,6 @@ void setup() {
   float battery = (bat.cellPercent());
 
   // Set the timezone and get the date(Not saved for deepsleep)
-  configTime(0, 0, ntpServer); // Normalize UTC
   String currentTime;
   currentTime = getFormattedDateTime();
 
